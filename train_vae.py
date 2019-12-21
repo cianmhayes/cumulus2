@@ -5,6 +5,7 @@ from cumulus2_vae_model import *
 from model_trainer import *
 from PIL import Image
 from torchvision.transforms.functional import to_tensor
+from local_image_dataset import LocalImageDataset
 
 class LocalSnapshotSaver(ModuleSnapshotSaver):
     def __init__(self, output_root, model_name) -> None:
@@ -65,6 +66,8 @@ def standardize_image(
     return im.resize(new_size, Image.BICUBIC)
 
 def standardize_dataset(source_path:str, output_path:str) -> None:
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
     for dir_path, _, file_names in os.walk(source_path):
         for file_name in file_names:
             full_path = os.path.join(dir_path, file_name)
@@ -76,17 +79,19 @@ def standardize_dataset(source_path:str, output_path:str) -> None:
 
 def main():
     output_root = os.path.join(os.path.dirname(__file__), "output")
+    #print("Preparing dataset")
+    #standardize_dataset("C:\\data\\clouds", "C:\\data\\clouds_standard")
+    #print("Preparing dataset complete")
     trainer = ModelTrainer(
         Cloud2VaeFactory(3, 8),
         Cloud2VaeOptimizer(),
         Cloud2VaeLoss(),
-        LocalDatabase("C:\\data\\clouds_standard"),
+        LocalImageDataset("C:\\data\\clouds_standard"),
         [LocalSnapshotSaver(output_root, "cumulus2_vae")])
     trainer.start(100)
 
 if __name__ == "__main__":
     main()
-    # TODO dataloader that can return a minibatch
     # TODO move datset to cloud storage
     # TODO better loss logging
     # TODO also render a sample from the test set

@@ -5,7 +5,8 @@ import torch
 import torch.nn
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim.optimizer import Optimizer
-
+from torch.utils.data.sampler import SubsetRandomSampler
+import numpy as np
 
 class ModuleFactory(ABC):
 
@@ -82,6 +83,8 @@ class ModelTrainer(object):
             loss_function:LossCalculator,
             dataset:torch.utils.data.Dataset,
             snapshot_savers:Sequence[ModuleSnapshotSaver],
+            test_split=0.2,
+            batch_size=1,
             gradient_clip=None,
             force_cpu=False) -> None:
         self.module_factory = factory
@@ -90,11 +93,14 @@ class ModelTrainer(object):
         self.dataset = dataset
         self.snapshot_savers = snapshot_savers
         self.gradient_clip = gradient_clip
+        self.batch_size = batch_size
+        self.test_split = test_split
+
+        self._configure_data_loaders(test_split,batch_size)
 
         device_name = "cuda" if torch.cuda.is_available() and not force_cpu else "cpu"
         self.device = torch.device(device_name)
 
-        self.dataset.set_device(self.device)
         self.module = self.module_factory.create_instance()
         self.module.to(self.device)
         self.optimizer.configure(self.module)
@@ -111,11 +117,29 @@ class ModelTrainer(object):
             self._save()
             self.optimizer.step_lr_schedule(self.progress.epoch)
 
+    def _configure_data_loaders(self, test_split:float, batch_size:int) -> None:
+        dataset_size = len(self.dataset)
+        indices = list(range(dataset_size))
+        split = int(test_split * dataset_size)
+        np.random.shuffle(indices)
+        train_indices = indices[split:]
+        test_indices = indices[:split]
+        train_sampler = SubsetRandomSampler(train_indices)
+        test_sampler = SubsetRandomSampler(test_indices)
+        self.training_data_loader = torch.utils.data.DataLoader(
+            self.dataset,
+            batch_size=batch_size,
+            sampler=train_sampler)
+        self.test_data_loader = torch.utils.data.DataLoader(
+            self.dataset,
+            batch_size=batch_size,
+            sampler=test_sampler)
+
     def _train(self) -> None:
         self.module.train()
         training_loss = 0.0
         count = 0
-        for n, training_sample in enumerate(self.dataset.train_set):
+        for _, training_sample in enumerate(self.training_data_loader):
             self.optimizer.zero_grad()
             loss = self.loss_function.get_loss(training_sample, self.module)
             loss.backward()
@@ -123,7 +147,7 @@ class ModelTrainer(object):
                 # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/16
                 torch.nn.utils.clip_grad_norm_(self.module.parameters(), self.gradient_clip)
             training_loss += float(loss)
-            count += n
+            count += self.batch_size
             self.optimizer.step()
         training_loss /= count
         print('Train set loss: {:.4f}'.format(training_loss))
@@ -133,11 +157,11 @@ class ModelTrainer(object):
         with torch.no_grad():
             test_loss = 0.0
             count = 0
-            for n, test_sample in enumerate(self.dataset.test_set):
+            for n, test_sample in enumerate(self.test_data_loader):
                 self.optimizer.zero_grad()
                 loss = self.loss_function.get_loss(test_sample, self.module)
                 test_loss += float(loss)
-                count += n
+                count += self.batch_size
             test_loss /= count
             print('Test set loss: {:.4f}'.format(test_loss))
 

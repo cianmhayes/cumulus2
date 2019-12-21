@@ -4,7 +4,7 @@ from torchvision.transforms import ToTensor
 from PIL import Image
 import os
 import numpy as np
-from typing import Dict, NewType, Sequence, Tuple, Optional
+from typing import Dict, Iterable, NewType, Sequence, Tuple, Optional
 
 
 class LocalImageDataset(Dataset):
@@ -21,8 +21,7 @@ class LocalImageDataset(Dataset):
     def __len__(self) -> int:
         return len(self.source_files)
 
-    def __getitem__(self, idx:int) -> Tuple:
-        result = []
+    def __getitem__(self, idx:int) -> Iterable[torch.Tensor]:
         im = Image.open(self.source_files[idx])
-        result = ToTensor()(im)
-        return tuple(result)
+        return [ToTensor()(im)]
+        #return tuple(result)
