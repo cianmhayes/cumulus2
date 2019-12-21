@@ -1,0 +1,6 @@
+Pillow
+numpy
+azure
+pytest
+pylint
+lmdb
