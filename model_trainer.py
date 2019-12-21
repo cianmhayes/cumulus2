@@ -7,6 +7,7 @@ from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
+import time
 
 class ModuleFactory(ABC):
 
@@ -41,6 +42,43 @@ class ModuleSnapshotSaver(ABC):
     def save(self, module: torch.nn.Module, module_parameters: Dict, progress: Progress) -> None:
         raise NotImplementedError()
 
+
+class ProgressLogger(object):
+    def __init__(self) -> None:
+        self.current_epoch_training_loss = 0.0
+        self.current_epoch_test_loss = 0.0
+        self.current_epoch_training_count = 0
+        self.current_epoch_testsing_count = 0
+        self.current_epoch = 0
+        self.current_epoch_start_time = time.clock()
+
+    def start_epoch(self) -> None:
+        self.current_epoch += 1
+        print("==================================================")
+        print("Starting epoch ", self.current_epoch)
+        print("==================================================")
+        self.current_epoch_training_loss = 0.0
+        self.current_epoch_test_loss = 0.0
+        self.current_epoch_training_count = 0
+        self.current_epoch_test_count = 0
+        self.current_epoch_start_time = time.clock()
+
+    def log_training_loss(self, loss:float, batch_size:int) -> None:
+        self.current_epoch_training_loss += loss
+        self.current_epoch_training_count += batch_size
+
+    def log_test_loss(self, loss:float, batch_size:int) -> None:
+        self.current_epoch_test_loss += loss
+        self.current_epoch_test_count += batch_size
+
+    def end_epoch(self) -> None:
+        duration = self.current_epoch_start_time - time.clock()
+        training_loss = self.current_epoch_training_loss / self.current_epoch_training_count
+        test_loss = self.current_epoch_test_loss / self.current_epoch_test_count
+        print('Duration: {:.2f} minutes'.format(duration / 60))
+        print('Train loss: {:.4f}'.format(training_loss))
+        print('Test loss: {:.4f}'.format(test_loss))
+        
 
 class ModuleOptimizer(ABC):
 
@@ -105,17 +143,17 @@ class ModelTrainer(object):
         self.module.to(self.device)
         self.optimizer.configure(self.module)
         self.progress = Progress()
+        self.progress_logger = ProgressLogger()
 
     def start(self, epochs:int) -> None:
         for _ in range(epochs):
             self.progress.start_epoch()
-            print("==================================================")
-            print("Start Epoch {}".format(self.progress.epoch))
-            print("==================================================")
+            self.progress_logger.start_epoch()
             self._train()
             self._test()
             self._save()
             self.optimizer.step_lr_schedule(self.progress.epoch)
+            self.progress_logger.end_epoch()
 
     def _configure_data_loaders(self, test_split:float, batch_size:int) -> None:
         dataset_size = len(self.dataset)
@@ -146,11 +184,8 @@ class ModelTrainer(object):
             if self.gradient_clip is not None:
                 # https://discuss.pytorch.org/t/proper-way-to-do-gradient-clipping/191/16
                 torch.nn.utils.clip_grad_norm_(self.module.parameters(), self.gradient_clip)
-            training_loss += float(loss)
-            count += self.batch_size
+            self.progress_logger.log_training_loss(float(loss), self.batch_size)
             self.optimizer.step()
-        training_loss /= count
-        print('Train set loss: {:.4f}'.format(training_loss))
 
     def _test(self) -> None:
         self.module.eval()
@@ -160,10 +195,7 @@ class ModelTrainer(object):
             for n, test_sample in enumerate(self.test_data_loader):
                 self.optimizer.zero_grad()
                 loss = self.loss_function.get_loss(test_sample, self.module)
-                test_loss += float(loss)
-                count += self.batch_size
-            test_loss /= count
-            print('Test set loss: {:.4f}'.format(test_loss))
+                self.progress_logger.log_test_loss(float(loss), self.batch_size)
 
     def _save(self) -> None:
         paramaters = self.module_factory.get_construction_parameters()

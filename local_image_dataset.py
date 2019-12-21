@@ -24,4 +24,3 @@ class LocalImageDataset(Dataset):
     def __getitem__(self, idx:int) -> Iterable[torch.Tensor]:
         im = Image.open(self.source_files[idx])
         return [ToTensor()(im)]
-        #return tuple(result)
