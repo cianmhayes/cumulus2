@@ -1,11 +1,14 @@
 import os
-import json
 import random
 from cumulus2_vae_model import *
 from model_trainer import *
 from PIL import Image
 from torchvision.transforms.functional import to_tensor
 from local_image_dataset import LocalImageDataset
+from uuid import uuid4
+from torchvision.transforms import ToPILImage
+
+random.seed(20190629)
 
 class LocalSnapshotSaver(ModuleSnapshotSaver):
     def __init__(self, output_root, model_name) -> None:
@@ -33,6 +36,17 @@ class LocalSnapshotSaver(ModuleSnapshotSaver):
             },
             model_path)
 
+    def save_sample(self, sample:torch.Tensor, progress: Progress) -> None:
+        epoch_folder = os.path.join(            self.output_root,
+            str(progress.epoch))
+        if not os.path.exists(epoch_folder):
+            os.makedirs(epoch_folder)
+        output_path = os.path.join(
+            epoch_folder,
+            "{}.png".format(str(uuid4())))
+        single_image = sample[0]
+        im = ToPILImage()(single_image)
+        im.save(output_path)
 
 
 def standardize_image(
@@ -63,7 +77,7 @@ def standardize_image(
     new_size = (target_short_side_length, target_long_side_length)
     if im_size[1] <= im_size[0]:
         new_size = (target_long_side_length, target_short_side_length)
-    return im.resize(new_size, Image.BICUBIC)
+    return im.resize(new_size, Image.BICUBIC).convert("RGB")
 
 def standardize_dataset(source_path:str, output_path:str) -> None:
     if not os.path.exists(output_path):
@@ -87,11 +101,10 @@ def main():
         Cloud2VaeOptimizer(),
         Cloud2VaeLoss(),
         LocalImageDataset("C:\\data\\clouds_standard"),
-        [LocalSnapshotSaver(output_root, "cumulus2_vae")])
+        [LocalSnapshotSaver(output_root, "cumulus2_vae")],
+        ProgressLogger(output_root),
+        test_split=0.1)
     trainer.start(100)
 
 if __name__ == "__main__":
     main()
-    # TODO move datset to cloud storage
-    # TODO better loss logging
-    # TODO also render a sample from the test set

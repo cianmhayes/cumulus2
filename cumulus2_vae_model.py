@@ -2,7 +2,7 @@ from typing import Dict, Sequence, Tuple
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from model_trainer import LossCalculator, ModuleFactory, ModuleOptimizer
+from model_trainer import LossCalculator, ModuleFactory, ModuleOptimizer, ModuleSnapshotSaver, Progress
 import math
 import torch.optim as optim
 
@@ -84,8 +84,16 @@ class Cloud2VaeLoss(LossCalculator):
     def __init__(self) -> None:
         pass
 
-    def get_loss(self, sample:Sequence[torch.Tensor], module:torch.nn.Module) -> torch.Tensor:
+    def get_loss(
+            self,
+            sample:Sequence[torch.Tensor],
+            module:torch.nn.Module,
+            snapshot_savers:Sequence[ModuleSnapshotSaver] = None,
+            progress:Progress = None) -> torch.Tensor:
         transcoded_image, mu, log_variance, _ = module(sample[0])
+        if snapshot_savers and progress:
+            for snapshot_saver in snapshot_savers:
+                snapshot_saver.save_sample(transcoded_image, progress)
         return self.loss_function(transcoded_image, sample[0], mu, log_variance)
 
     def loss_function(
@@ -96,7 +104,6 @@ class Cloud2VaeLoss(LossCalculator):
             log_variance:torch.Tensor):
         cross_entropy = F.binary_cross_entropy(decoded_values, values, reduction="sum")
         kl_divergence = -0.5 * torch.sum(1+ log_variance - mu.pow(2) - log_variance.exp())
-        #kl_divergence = -0.5 * (1 + log_variance - mu.pow(2) - log_variance.exp())
         return cross_entropy + kl_divergence
 
 
@@ -104,9 +111,9 @@ class Cloud2VaeOptimizer(ModuleOptimizer):
 
     def __init__(
             self,
-            starting_learning_rate= 0.001,
-            lr_decay_steps=40,
-            lr_decay_gamma=0.1):
+            starting_learning_rate= 0.01,
+            lr_decay_steps=10,
+            lr_decay_gamma=0.5):
         self._optimizer = None
         self._lr_scheduler = None
         self._starting_learning_rate = starting_learning_rate

@@ -8,6 +8,7 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data.sampler import SubsetRandomSampler
 import numpy as np
 import time
+from torch.utils.tensorboard import SummaryWriter
 
 class ModuleFactory(ABC):
 
@@ -42,15 +43,20 @@ class ModuleSnapshotSaver(ABC):
     def save(self, module: torch.nn.Module, module_parameters: Dict, progress: Progress) -> None:
         raise NotImplementedError()
 
+    @abstractmethod
+    def save_sample(self, sample:torch.Tensor, progress: Progress) -> None:
+        raise NotImplementedError()
+
 
 class ProgressLogger(object):
-    def __init__(self) -> None:
+    def __init__(self, output_path) -> None:
         self.current_epoch_training_loss = 0.0
         self.current_epoch_test_loss = 0.0
         self.current_epoch_training_count = 0
         self.current_epoch_testsing_count = 0
         self.current_epoch = 0
         self.current_epoch_start_time = time.clock()
+        self.tb_writer = SummaryWriter(output_path)
 
     def start_epoch(self) -> None:
         self.current_epoch += 1
@@ -72,12 +78,14 @@ class ProgressLogger(object):
         self.current_epoch_test_count += batch_size
 
     def end_epoch(self) -> None:
-        duration = self.current_epoch_start_time - time.clock()
+        duration = time.clock() - self.current_epoch_start_time
         training_loss = self.current_epoch_training_loss / self.current_epoch_training_count
         test_loss = self.current_epoch_test_loss / self.current_epoch_test_count
         print('Duration: {:.2f} minutes'.format(duration / 60))
         print('Train loss: {:.4f}'.format(training_loss))
         print('Test loss: {:.4f}'.format(test_loss))
+        self.tb_writer.add_scalar("train_loss", training_loss, self.current_epoch)
+        self.tb_writer.add_scalar("test_loss", test_loss, self.current_epoch)
         
 
 class ModuleOptimizer(ABC):
@@ -109,7 +117,12 @@ class ModuleOptimizer(ABC):
 class LossCalculator(ABC):
 
     @abstractmethod
-    def get_loss(self, sample:Sequence[torch.Tensor], module:torch.nn.Module) -> torch.Tensor:
+    def get_loss(
+            self,
+            sample:Sequence[torch.Tensor],
+            module:torch.nn.Module,
+            snapshot_savers:Sequence[ModuleSnapshotSaver] = None,
+            progress:Progress = None) -> torch.Tensor:
         raise NotImplementedError()
 
 
@@ -121,6 +134,7 @@ class ModelTrainer(object):
             loss_function:LossCalculator,
             dataset:torch.utils.data.Dataset,
             snapshot_savers:Sequence[ModuleSnapshotSaver],
+            progress_logger:ProgressLogger,
             test_split=0.2,
             batch_size=1,
             gradient_clip=None,
@@ -143,7 +157,7 @@ class ModelTrainer(object):
         self.module.to(self.device)
         self.optimizer.configure(self.module)
         self.progress = Progress()
-        self.progress_logger = ProgressLogger()
+        self.progress_logger = progress_logger
 
     def start(self, epochs:int) -> None:
         for _ in range(epochs):
@@ -175,8 +189,6 @@ class ModelTrainer(object):
 
     def _train(self) -> None:
         self.module.train()
-        training_loss = 0.0
-        count = 0
         for _, training_sample in enumerate(self.training_data_loader):
             self.optimizer.zero_grad()
             loss = self.loss_function.get_loss(training_sample, self.module)
@@ -190,11 +202,9 @@ class ModelTrainer(object):
     def _test(self) -> None:
         self.module.eval()
         with torch.no_grad():
-            test_loss = 0.0
-            count = 0
-            for n, test_sample in enumerate(self.test_data_loader):
+            for _, test_sample in enumerate(self.test_data_loader):
                 self.optimizer.zero_grad()
-                loss = self.loss_function.get_loss(test_sample, self.module)
+                loss = self.loss_function.get_loss(test_sample, self.module, self.snapshot_savers, self.progress)
                 self.progress_logger.log_test_loss(float(loss), self.batch_size)
 
     def _save(self) -> None:

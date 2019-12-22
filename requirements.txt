@@ -1,6 +1,8 @@
 Pillow
 numpy
-azure
 pytest
 pylint
-lmdb
+tensorboard_logger
+tensorboard-pytorch
+tensorboard
+future
