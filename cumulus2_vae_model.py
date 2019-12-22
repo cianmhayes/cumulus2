@@ -90,11 +90,12 @@ class Cloud2VaeLoss(LossCalculator):
             module:torch.nn.Module,
             snapshot_savers:Sequence[ModuleSnapshotSaver] = None,
             progress:Progress = None) -> torch.Tensor:
-        transcoded_image, mu, log_variance, _ = module(sample[0])
+        input_sample = sample[0].to("cuda")
+        transcoded_image, mu, log_variance, _ = module(input_sample)
         if snapshot_savers and progress:
             for snapshot_saver in snapshot_savers:
                 snapshot_saver.save_sample(transcoded_image, progress)
-        return self.loss_function(transcoded_image, sample[0], mu, log_variance)
+        return self.loss_function(transcoded_image, input_sample, mu, log_variance)
 
     def loss_function(
             self,

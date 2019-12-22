@@ -191,6 +191,8 @@ class ModelTrainer(object):
         self.module.train()
         for _, training_sample in enumerate(self.training_data_loader):
             self.optimizer.zero_grad()
+            for t in training_sample:
+                t.to(self.device)
             loss = self.loss_function.get_loss(training_sample, self.module)
             loss.backward()
             if self.gradient_clip is not None:
@@ -204,6 +206,8 @@ class ModelTrainer(object):
         with torch.no_grad():
             for _, test_sample in enumerate(self.test_data_loader):
                 self.optimizer.zero_grad()
+                for t in test_sample:
+                    t.to(self.device)
                 loss = self.loss_function.get_loss(test_sample, self.module, self.snapshot_savers, self.progress)
                 self.progress_logger.log_test_loss(float(loss), self.batch_size)
 

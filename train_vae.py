@@ -45,7 +45,7 @@ class LocalSnapshotSaver(ModuleSnapshotSaver):
             epoch_folder,
             "{}.png".format(str(uuid4())))
         single_image = sample[0]
-        im = ToPILImage()(single_image)
+        im = ToPILImage()(single_image.to("cpu"))
         im.save(output_path)
 
 
@@ -93,6 +93,7 @@ def standardize_dataset(source_path:str, output_path:str) -> None:
 
 def main():
     output_root = os.path.join(os.path.dirname(__file__), "output")
+    data_root = os.path.join(os.path.dirname(__file__), "clouds_standard")
     #print("Preparing dataset")
     #standardize_dataset("C:\\data\\clouds", "C:\\data\\clouds_standard")
     #print("Preparing dataset complete")
@@ -100,11 +101,11 @@ def main():
         Cloud2VaeFactory(3, 8),
         Cloud2VaeOptimizer(),
         Cloud2VaeLoss(),
-        LocalImageDataset("C:\\data\\clouds_standard"),
+        LocalImageDataset(data_root),
         [LocalSnapshotSaver(output_root, "cumulus2_vae")],
         ProgressLogger(output_root),
         test_split=0.1)
-    trainer.start(100)
+    trainer.start(1000)
 
 if __name__ == "__main__":
     main()
