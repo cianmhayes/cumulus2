@@ -20,7 +20,7 @@ class LocalSnapshotSaver(ModuleSnapshotSaver):
             return True
         elif progress.epoch <= 100 and progress.epoch % 10 == 0:
             return True
-        elif progress.epoch % 50:
+        elif progress.epoch % 50 == 0:
             return True
         else:
             return False
@@ -98,7 +98,7 @@ def main():
     #standardize_dataset("C:\\data\\clouds", "C:\\data\\clouds_standard")
     #print("Preparing dataset complete")
     trainer = ModelTrainer(
-        Cloud2VaeFactory(3, 8),
+        Cloud2VaeFactory(3, 16),
         Cloud2VaeOptimizer(),
         Cloud2VaeLoss(),
         LocalImageDataset(data_root),

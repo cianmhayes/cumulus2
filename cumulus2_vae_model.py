@@ -112,8 +112,8 @@ class Cloud2VaeOptimizer(ModuleOptimizer):
 
     def __init__(
             self,
-            starting_learning_rate= 0.01,
-            lr_decay_steps=10,
+            starting_learning_rate= 0.005,
+            lr_decay_steps=50,
             lr_decay_gamma=0.5):
         self._optimizer = None
         self._lr_scheduler = None
