@@ -51,9 +51,9 @@ class LocalSnapshotSaver(ModuleSnapshotSaver):
 
 def standardize_image(
         file_path:str,
-        min_short_side_length:int = 720,
-        max_short_side_length:int = 1200,
-        dimension_factor:int = 60
+        min_short_side_length:int = 960,
+        max_short_side_length:int = 1920,
+        dimension_factor:int = 64
     ) -> Image:
     im = Image.open(file_path)
     im_size = im.size
@@ -90,13 +90,14 @@ def standardize_dataset(source_path:str, output_path:str) -> None:
                 im = standardize_image(full_path)
                 im.save(output_file)
 
+def prep_dataset():
+    print("Preparing dataset")
+    standardize_dataset("C:\\data\\clouds", "C:\\data\\clouds_standard")
+    print("Preparing dataset complete")
 
 def main():
     output_root = os.path.join(os.path.dirname(__file__), "output")
     data_root = os.path.join(os.path.dirname(__file__), "clouds_standard")
-    #print("Preparing dataset")
-    #standardize_dataset("C:\\data\\clouds", "C:\\data\\clouds_standard")
-    #print("Preparing dataset complete")
     trainer = ModelTrainer(
         Cloud2VaeFactory(3, 16),
         Cloud2VaeOptimizer(),
@@ -108,4 +109,5 @@ def main():
     trainer.start(1000)
 
 if __name__ == "__main__":
+    #prep_dataset()
     main()
