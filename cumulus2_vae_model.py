@@ -12,35 +12,44 @@ class Cumulus2Vae(torch.nn.Module):
         self.encoded_dimensions = encoded_dimensions
 
         self.encode_outer = nn.Sequential(
-            nn.Conv2d(channels, encoded_dimensions, 11, stride=5, padding=5, bias=False),
+            nn.Conv2d(channels, 32, 8, stride=4, padding=3, bias=False),
             nn.LeakyReLU(),
-            nn.BatchNorm2d(encoded_dimensions))
+            nn.BatchNorm2d(32))
 
         self.encode_middle = nn.Sequential(
-            nn.Conv2d(encoded_dimensions, encoded_dimensions, 9, stride=4, padding=4, bias=False),
+            nn.Conv2d(32, 64, 8, stride=4, padding=3, bias=False),
             nn.LeakyReLU(),
-            nn.BatchNorm2d(encoded_dimensions))
+            nn.BatchNorm2d(64))
 
         self.encode_inner = nn.Sequential(
-            nn.Conv2d(encoded_dimensions, encoded_dimensions, 7, stride=3, padding=3, bias=False),
+            nn.Conv2d(64, 128, 8, stride=4, padding=3, bias=False),
             nn.LeakyReLU(),
-            nn.BatchNorm2d(encoded_dimensions))
+            nn.BatchNorm2d(128))
         
+        self.encode_pseudo_dense = nn.Sequential(
+            nn.Conv2d(128, encoded_dimensions, 1),
+            nn.LeakyReLU())
+
         self.encode_mu = nn.Conv2d(encoded_dimensions, encoded_dimensions, 1)
         self.encode_log_var = nn.Conv2d(encoded_dimensions, encoded_dimensions, 1)
 
+        self.decode_pseudo_dense = nn.Sequential(
+            nn.Conv2d(encoded_dimensions, 128, 1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU())
+
         self.decode_inner = nn.Sequential(
-            nn.ConvTranspose2d(encoded_dimensions, encoded_dimensions, 7, stride=3, padding=2, bias=False),
-            nn.BatchNorm2d(encoded_dimensions),
+            nn.ConvTranspose2d(128, 64, 8, stride=4, padding=2, bias=False),
+            nn.BatchNorm2d(64),
             nn.ReLU())
 
         self.decode_middle = nn.Sequential(
-            nn.ConvTranspose2d(encoded_dimensions, encoded_dimensions, 8, stride=4, padding=2, bias=False),
-            nn.BatchNorm2d(encoded_dimensions),
+            nn.ConvTranspose2d(64, 32, 8, stride=4, padding=2, bias=False),
+            nn.BatchNorm2d(32),
             nn.ReLU())
 
         self.decode_outer = nn.Sequential(
-            nn.ConvTranspose2d(encoded_dimensions, channels, 9, stride=5, padding=2, bias=False),
+            nn.ConvTranspose2d(32, channels, 8, stride=4, padding=2, bias=False),
             nn.Sigmoid())
 
     def reparameterize(self, mu:torch.Tensor, log_var:torch.Tensor) -> torch.Tensor:
@@ -52,10 +61,12 @@ class Cumulus2Vae(torch.nn.Module):
         conv_encoding = self.encode_outer(source_image)
         conv_encoding = self.encode_middle(conv_encoding)
         conv_encoding = self.encode_inner(conv_encoding)
+        conv_encoding = self.encode_pseudo_dense(conv_encoding)
         return self.encode_mu(conv_encoding), self.encode_log_var(conv_encoding)
 
     def decode(self, z:torch.Tensor) -> torch.Tensor:
-        decode = self.decode_inner(z)
+        decode = self.decode_pseudo_dense(z)
+        decode = self.decode_inner(decode)
         decode = self.decode_middle(decode)
         decode = self.decode_outer(decode)
         return decode
