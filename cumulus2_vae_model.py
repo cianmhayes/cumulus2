@@ -93,7 +93,7 @@ class Cloud2VaeFactory(ModuleFactory):
 
 class Cloud2VaeLoss(LossCalculator):
     def __init__(self) -> None:
-        pass
+        super().__init__()
 
     def get_loss(
             self,
@@ -101,7 +101,7 @@ class Cloud2VaeLoss(LossCalculator):
             module:torch.nn.Module,
             snapshot_savers:Sequence[ModuleSnapshotSaver] = None,
             progress:Progress = None) -> torch.Tensor:
-        input_sample = sample[0].to("cuda")
+        input_sample = sample[0].to(self.device)
         transcoded_image, mu, log_variance, _ = module(input_sample)
         if snapshot_savers and progress:
             for snapshot_saver in snapshot_savers:
