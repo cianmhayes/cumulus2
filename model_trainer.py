@@ -115,6 +115,11 @@ class ModuleOptimizer(ABC):
 
 
 class LossCalculator(ABC):
+    def __init__(self) -> None:
+        self.device = torch.device("cpu")
+
+    def set_device(self, device:torch.device) -> None:
+        self.device = device
 
     @abstractmethod
     def get_loss(
@@ -153,6 +158,7 @@ class ModelTrainer(object):
         device_name = "cuda" if torch.cuda.is_available() and not force_cpu else "cpu"
         self.device = torch.device(device_name)
 
+        self.loss_function.set_device(self.device)
         self.module = self.module_factory.create_instance()
         self.module.to(self.device)
         self.optimizer.configure(self.module)
@@ -214,5 +220,4 @@ class ModelTrainer(object):
     def _save(self) -> None:
         paramaters = self.module_factory.get_construction_parameters()
         for saver in self.snapshot_savers:
-            if saver.should_save(self.progress):
-                saver.save(self.module, paramaters, self.progress)
+            saver.save(self.module, paramaters, self.progress)
