@@ -13,6 +13,7 @@ from torchvision.transforms import ToPILImage
 from local_snapshot_saver import LocalSnapshotSaver
 from typing import Dict, Iterable, NewType, Sequence, Tuple, Optional
 from torchvision.transforms import ToTensor
+from train_vae import standardize_image
 
 class DepthEncoderDataset(Dataset):
     def __init__(
@@ -21,33 +22,50 @@ class DepthEncoderDataset(Dataset):
             cloud_model:Cumulus2Vae,
             image_limit:Optional[int]=None) -> None:
         self.root_path = root_path
+        self.colour_root = os.path.join(self.root_path, "colour")
+        self.desat_root = os.path.join(self.root_path, "desat")
         self.source_files = []
-        for dir_path, _, file_names in os.walk(self.root_path):
+        for dir_path, _, file_names in os.walk(self.desat_root):
             for file_name in file_names:
-                full_path = os.path.join(dir_path, file_name)
-                self.source_files.append(full_path)
+                full_desat_path = os.path.join(dir_path, file_name)
+                full_colour_path = os.path.join(self.colour_root, file_name)
+                if not os.path.exists(full_desat_path):
+                    raise Exception("Missing file".format(full_desat_path))
+                if not os.path.exists(full_colour_path):
+                    raise Exception("Missing file".format(full_colour_path))
+                self.source_files.append({"colour": full_colour_path, "desat": full_desat_path})
         if image_limit:
             self.source_files = self.source_files[:image_limit]
-        self.desaturated_images = []
-        self.target_mu = []
-        self.target_log_var = []
-        for path in self.source_files:
-            im = Image.open(path)
-            desat = im.convert("L")
-            im_tensor = ToTensor()(im)
-            mu, log_var = cloud_model.encode(im_tensor)
-            self.desaturated_images.append(desat)
-            self.target_mu.append(mu)
-            self.target_log_var.append(log_var)
+
 
     def __len__(self) -> int:
-        return len(self.desaturated_images)
+        return len(self.source_files)
 
     def __getitem__(self, idx:int) -> Iterable[torch.Tensor]:
         return [
             self.desaturated_images[idx],
             self.target_mu[idx],
             self.target_log_var[idx]]
+
+def prepare_dataset(source_root:str, output_root:str) -> Tuple[str]:
+    colour_output_root = os.path.join(output_root, "colour")
+    if not os.path.exists(colour_output_root):
+        os.makedirs(colour_output_root)
+    desat_output_root = os.path.join(output_root, "desat")
+    if not os.path.exists(desat_output_root):
+        os.makedirs(desat_output_root)
+    for dir_path, _, file_names in os.walk(source_root):
+        for file_name in file_names:
+            full_path = os.path.join(dir_path, file_name)
+            colour_output_path = os.path.join(colour_output_root, file_name)
+            desat_output_path = os.path.join(desat_output_root, file_name)
+            im = standardize_image(full_path)
+            im.save(colour_output_path)
+            desat = im.convert("L")
+            new_size = (int(im.size[0]/4), int(im.size[1]/4))
+            desat.resize(new_size, Image.BICUBIC)
+            desat.save(desat_output_path)
+    return colour_output_root, desat_output_root
 
 
 def load_cloud_model(path:str):
@@ -75,4 +93,5 @@ def main():
     trainer.start(1000)
 
 if __name__ == "__main__":
-    main()
+    #main()
+    prepare_dataset("C:\\data\\clouds", "C:\\data\\clouds_desat")

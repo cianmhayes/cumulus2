@@ -13,20 +13,20 @@ class DepthEncoder(torch.nn.Module):
         self.encoded_dimensions = encoded_dimensions
 
         self.encode_outer = nn.Sequential(
-            nn.Conv2d(channels, 32, 8, stride=4, padding=3, bias=False),
+            nn.Conv2d(1, 32, 8, stride=4, padding=2, bias=False),
             nn.LeakyReLU(),
             nn.BatchNorm2d(32))
 
         self.encode_middle = nn.Sequential(
-            nn.Conv2d(32, 64, 8, stride=4, padding=3, bias=False),
+            nn.Conv2d(32, 64, 4, stride=2, padding=1, bias=False),
             nn.LeakyReLU(),
             nn.BatchNorm2d(64))
 
         self.encode_inner = nn.Sequential(
-            nn.Conv2d(64, 128, 8, stride=4, padding=3, bias=False),
+            nn.Conv2d(64, 128, 4, stride=2, padding=1, bias=False),
             nn.LeakyReLU(),
             nn.BatchNorm2d(128))
-        
+
         self.encode_pseudo_dense = nn.Sequential(
             nn.Conv2d(128, encoded_dimensions, 1),
             nn.LeakyReLU())
@@ -71,3 +71,10 @@ class DepthEncoderLoss(LossCalculator):
                 transcoded_image = self.vae_model.decode(z)
                 snapshot_saver.save_sample(transcoded_image, progress)
         return F.mse_loss(mu, sample[1], reduction="sum") + F.mse_loss(log_var, sample[2], reduction="sum")
+
+if __name__ == "__main__":
+    model = DepthEncoder(16)
+    input_tensor = torch.zeros((1,1, 496, 480))
+    mu, log_var = model(input_tensor)
+    print(mu.size())
+    print(log_var.size())
