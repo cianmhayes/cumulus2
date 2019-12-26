@@ -14,6 +14,7 @@ from local_snapshot_saver import LocalSnapshotSaver
 from typing import Dict, Iterable, NewType, Sequence, Tuple, Optional
 from torchvision.transforms import ToTensor
 from train_vae import standardize_image
+from datetime import datetime
 
 class DepthEncoderDataset(Dataset):
     def __init__(
@@ -51,7 +52,7 @@ class DepthEncoderDataset(Dataset):
         mu, log_var = self.cloud_model.encode(torch.stack([im_tensor]))
         return [desat_tensor, mu[0], log_var[0]]
 
-def prepare_dataset(source_root:str, output_root:str) -> Tuple[str]:
+def prepare_dataset(source_root:str, output_root:str) -> Tuple[str, str]:
     colour_output_root = os.path.join(output_root, "colour")
     if not os.path.exists(colour_output_root):
         os.makedirs(colour_output_root)
@@ -83,7 +84,12 @@ def load_cloud_model(path:str):
 
 def main():
     output_root = os.path.join(os.path.dirname(__file__), "output")
-    data_root = os.path.join(os.path.dirname(__file__), "clouds_standard")
+    output_root = os.path.join(
+        output_root,
+        "depth_encoder",
+        "{:%Y%m%d_%H%M%S}".format(datetime.now()))
+
+    data_root = os.path.join(os.path.dirname(__file__), "data", "clouds_depth")
     cloud_model_path = os.path.join(os.path.dirname(__file__), "cumulus2_vae_e650.pt")
 
     device_name = "cuda" if torch.cuda.is_available() else "cpu"

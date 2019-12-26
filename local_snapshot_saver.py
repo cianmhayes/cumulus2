@@ -11,10 +11,7 @@ from datetime import datetime
 
 class LocalSnapshotSaver(ModuleSnapshotSaver):
     def __init__(self, output_root, model_name) -> None:
-        self.output_root = os.path.join(
-            output_root,
-            model_name,
-            "{:%Y%m%d_%H%M%S}".format(datetime.now()))
+        self.output_root = output_root
         self.model_name = model_name
 
     def should_save(self, progress: Progress) -> bool:

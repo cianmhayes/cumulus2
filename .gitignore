@@ -3,3 +3,10 @@
 .pytest_cache
 __pycache__
 output
+data
+
+# .net
+bin
+Debug
+packages
+.vs
