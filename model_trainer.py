@@ -220,5 +220,4 @@ class ModelTrainer(object):
     def _save(self) -> None:
         paramaters = self.module_factory.get_construction_parameters()
         for saver in self.snapshot_savers:
-            if saver.should_save(self.progress):
-                saver.save(self.module, paramaters, self.progress)
+            saver.save(self.module, paramaters, self.progress)
