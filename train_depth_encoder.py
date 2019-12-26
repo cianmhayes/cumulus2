@@ -19,42 +19,38 @@ class DepthEncoderDataset(Dataset):
             self,
             root_path:str,
             cloud_model:Cumulus2Vae,
+            taret_device:torch.device,
             image_limit:Optional[int]=None) -> None:
         self.root_path = root_path
         self.source_files = []
+        self.cloud_model = cloud_model
+        self.device = taret_device
         for dir_path, _, file_names in os.walk(self.root_path):
             for file_name in file_names:
                 full_path = os.path.join(dir_path, file_name)
                 self.source_files.append(full_path)
         if image_limit:
             self.source_files = self.source_files[:image_limit]
-        self.desaturated_images = []
-        self.target_mu = []
-        self.target_log_var = []
-        for path in self.source_files:
-            im = Image.open(path)
-            desat = im.convert("L")
-            im_tensor = ToTensor()(im)
-            mu, log_var = cloud_model.encode(im_tensor)
-            self.desaturated_images.append(desat)
-            self.target_mu.append(mu)
-            self.target_log_var.append(log_var)
 
     def __len__(self) -> int:
-        return len(self.desaturated_images)
+        return len(self.source_files)
 
     def __getitem__(self, idx:int) -> Iterable[torch.Tensor]:
-        return [
-            self.desaturated_images[idx],
-            self.target_mu[idx],
-            self.target_log_var[idx]]
+        im = Image.open(self.source_files[idx])
+        desat = im.convert("L")
+        im_tensor = ToTensor()(im).to(self.device)
+        desat_tensor = ToTensor()(desat).to(self.device)
+        mu, log_var = self.cloud_model.encode(torch.stack([im_tensor]))
+        return [desat_tensor, mu[0], log_var[0]]
 
 
 def load_cloud_model(path:str):
+    print("Loading model from:", path)
     checkpoint = torch.load(path, map_location="cpu")
     model = Cumulus2Vae(3, 16)
     model.load_state_dict(checkpoint["module_state"])
     model.eval()
+    print("Model loaded")
     return model
 
 def main():
@@ -62,13 +58,16 @@ def main():
     data_root = os.path.join(os.path.dirname(__file__), "clouds_standard")
     cloud_model_path = os.path.join(os.path.dirname(__file__), "cumulus2_vae_e650.pt")
 
+    device_name = "cuda" if torch.cuda.is_available() else "cpu"
+    target_device = torch.device(device_name)
     cloud_model = load_cloud_model(cloud_model_path)
+    cloud_model = cloud_model.to(target_device)
 
     trainer = ModelTrainer(
         DepthEncoderFactory(16),
         Cloud2VaeOptimizer(),
         DepthEncoderLoss(cloud_model),
-        DepthEncoderDataset(data_root, cloud_model),
+        DepthEncoderDataset(data_root, cloud_model, target_device),
         [LocalSnapshotSaver(output_root, "depth_encoder")],
         ProgressLogger(output_root),
         test_split=0.1)

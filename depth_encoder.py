@@ -13,7 +13,7 @@ class DepthEncoder(torch.nn.Module):
         self.encoded_dimensions = encoded_dimensions
 
         self.encode_outer = nn.Sequential(
-            nn.Conv2d(channels, 32, 8, stride=4, padding=3, bias=False),
+            nn.Conv2d(1, 32, 8, stride=4, padding=3, bias=False),
             nn.LeakyReLU(),
             nn.BatchNorm2d(32))
 
@@ -57,6 +57,10 @@ class DepthEncoderLoss(LossCalculator):
         super().__init__()
         self.vae_model = vae_model
 
+    def set_device(self, device:torch.device) -> None:
+        super().set_device(device)
+        self.vae_model.to(device)
+
     def get_loss(
             self,
             sample:Sequence[torch.Tensor],
@@ -64,10 +68,12 @@ class DepthEncoderLoss(LossCalculator):
             snapshot_savers:Sequence[ModuleSnapshotSaver] = None,
             progress:Progress = None) -> torch.Tensor:
         input_sample = sample[0].to(self.device)
+        target_mu = sample[1].to(self.device)
+        target_log_var = sample[2].to(self.device)
         mu, log_var = module(input_sample)
         if snapshot_savers and progress:
             for snapshot_saver in snapshot_savers:
                 z = self.vae_model.reparameterize(mu, log_var)
                 transcoded_image = self.vae_model.decode(z)
                 snapshot_saver.save_sample(transcoded_image, progress)
-        return F.mse_loss(mu, sample[1], reduction="sum") + F.mse_loss(log_var, sample[2], reduction="sum")
+        return F.mse_loss(mu, target_mu, reduction="sum") + F.mse_loss(log_var, target_log_var, reduction="sum")
