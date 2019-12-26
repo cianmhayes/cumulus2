@@ -105,7 +105,8 @@ def main():
         LocalImageDataset(data_root),
         [LocalSnapshotSaver(output_root, "cumulus2_vae")],
         ProgressLogger(output_root),
-        test_split=0.1)
+        test_split=0.1,
+        gradient_clip=5.0)
     trainer.start(1000)
 
 if __name__ == "__main__":
