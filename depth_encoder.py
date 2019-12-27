@@ -13,22 +13,22 @@ class DepthEncoder(torch.nn.Module):
         self.encoded_dimensions = encoded_dimensions
 
         self.encode_outer = nn.Sequential(
-            nn.Conv2d(1, 32, 8, stride=4, padding=3, bias=False),
+            nn.Conv2d(1, 8, 8, stride=4, padding=3, bias=False),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(8))
+
+        self.encode_middle = nn.Sequential(
+            nn.Conv2d(8, 16, 4, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(),
+            nn.BatchNorm2d(16))
+
+        self.encode_inner = nn.Sequential(
+            nn.Conv2d(16, 32, 4, stride=2, padding=1, bias=False),
             nn.LeakyReLU(),
             nn.BatchNorm2d(32))
 
-        self.encode_middle = nn.Sequential(
-            nn.Conv2d(32, 64, 4, stride=2, padding=1, bias=False),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(64))
-
-        self.encode_inner = nn.Sequential(
-            nn.Conv2d(64, 128, 4, stride=2, padding=1, bias=False),
-            nn.LeakyReLU(),
-            nn.BatchNorm2d(128))
-
         self.encode_pseudo_dense = nn.Sequential(
-            nn.Conv2d(128, encoded_dimensions, 1),
+            nn.Conv2d(32, encoded_dimensions, 1),
             nn.LeakyReLU())
 
         self.encode_mu = nn.Conv2d(encoded_dimensions, encoded_dimensions, 1)
