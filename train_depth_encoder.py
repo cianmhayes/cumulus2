@@ -68,7 +68,7 @@ def prepare_dataset(source_root:str, output_root:str) -> Tuple[str, str]:
             im.save(colour_output_path)
             desat = im.convert("L")
             new_size = (int(im.size[0]/4), int(im.size[1]/4))
-            desat.resize(new_size, Image.BICUBIC)
+            desat = desat.resize(new_size, Image.BICUBIC)
             desat.save(desat_output_path)
     return colour_output_root, desat_output_root
 
@@ -108,5 +108,7 @@ def main():
     trainer.start(1000)
 
 if __name__ == "__main__":
-    #main()
-    prepare_dataset("C:\\data\\clouds", "C:\\data\\clouds_desat")
+    main()
+    #source = os.path.join(os.path.dirname(__file__), "data", "clouds")
+    #dest = os.path.join(os.path.dirname(__file__), "data", "clouds_depth")
+    #prepare_dataset(source, dest)s
